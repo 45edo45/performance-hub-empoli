@@ -1,0 +1,16 @@
+# Database locale — non va su GitHub
+database/
+*.db
+*.sqlite
+
+# Secrets — MAI su GitHub
+.streamlit/secrets.toml
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.env
+
+# macOS
+.DS_Store
