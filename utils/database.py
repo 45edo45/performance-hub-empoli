@@ -25,13 +25,15 @@ def _load_db_url() -> str:
     url = os.environ.get("DATABASE_URL", "")
     if url:
         return url
-    # 2. st.secrets (Streamlit Cloud) — solo se dentro una sessione attiva
+    # 2. st.secrets (Streamlit Cloud)
     try:
         import streamlit as st
-        url = st.secrets.get("DATABASE_URL", "") or ""
-        return url
+        url = st.secrets["DATABASE_URL"]
+        if url:
+            return str(url).strip()
     except Exception:
-        return ""
+        pass
+    return ""
 
 
 class _Row(dict):
