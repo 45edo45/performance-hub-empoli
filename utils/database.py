@@ -89,6 +89,18 @@ class _Cursor:
                 "ORDER BY ordinal_position"
             )
 
+        # GROUP_CONCAT → STRING_AGG (PostgreSQL)
+        sql = re.sub(
+            r"GROUP_CONCAT\((\w+),\s*'([^']*)'\)",
+            lambda m: f"STRING_AGG({m.group(1)}::TEXT, '{m.group(2)}')",
+            sql, flags=re.IGNORECASE,
+        )
+        sql = re.sub(
+            r"GROUP_CONCAT\((\w+)\)",
+            lambda m: f"STRING_AGG({m.group(1)}::TEXT, ',')",
+            sql, flags=re.IGNORECASE,
+        )
+
         # INSERT OR IGNORE → INSERT … ON CONFLICT DO NOTHING
         if is_insert_ignore or re.search(r"INSERT\s+OR\s+IGNORE", sql, re.IGNORECASE):
             sql = re.sub(
