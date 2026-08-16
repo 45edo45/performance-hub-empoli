@@ -124,15 +124,17 @@ class _Cursor:
             )
 
         # GROUP_CONCAT → STRING_AGG (PostgreSQL)
+        # [\w.]+ cattura sia "colonna" che "tabella.colonna"
+        # re.DOTALL permette che il match attraversi newline (query multi-riga)
         sql = re.sub(
-            r"GROUP_CONCAT\((\w+),\s*'([^']*)'\)",
+            r"GROUP_CONCAT\(\s*([\w.]+)\s*,\s*'([^']*)'\s*\)",
             lambda m: f"STRING_AGG({m.group(1)}::TEXT, '{m.group(2)}')",
-            sql, flags=re.IGNORECASE,
+            sql, flags=re.IGNORECASE | re.DOTALL,
         )
         sql = re.sub(
-            r"GROUP_CONCAT\((\w+)\)",
+            r"GROUP_CONCAT\(\s*([\w.]+)\s*\)",
             lambda m: f"STRING_AGG({m.group(1)}::TEXT, ',')",
-            sql, flags=re.IGNORECASE,
+            sql, flags=re.IGNORECASE | re.DOTALL,
         )
 
         # INSERT OR IGNORE → INSERT … ON CONFLICT DO NOTHING
