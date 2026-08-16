@@ -123,6 +123,13 @@ class _Cursor:
                 "ORDER BY ordinal_position"
             )
 
+        # date(expr) → expr::date  (SQLite function non esiste in PostgreSQL)
+        sql = re.sub(
+            r"\bdate\(([^)]+)\)",
+            lambda m: f"({m.group(1)})::date",
+            sql, flags=re.IGNORECASE,
+        )
+
         # GROUP_CONCAT → STRING_AGG (PostgreSQL)
         # [\w.]+ cattura sia "colonna" che "tabella.colonna"
         # re.DOTALL permette che il match attraversi newline (query multi-riga)
@@ -596,7 +603,8 @@ def get_sessions():
     rows = cursor.fetchall()
     conn.close()
 
-    return rows
+    # Ritorna tuple per compatibilità con pd.DataFrame(rows, columns=[...])
+    return [tuple(r) for r in rows]
 
 
 
@@ -2862,6 +2870,7 @@ def get_gps_storico(
     seduta_ids=None,
     data_da=None,
     data_a=None,
+    stagione_id=None,
 ):
     """
     Restituisce tutti i record GPS (+ cardio via LEFT JOIN) con data seduta e nome giocatore.
@@ -2891,6 +2900,10 @@ def get_gps_storico(
     if data_a:
         filtri.append("date(sedute.data) <= date(?)")
         params.append(str(data_a))
+
+    if stagione_id is not None:
+        filtri.append("sedute.stagione_id = ?")
+        params.append(int(stagione_id))
 
     where = " AND ".join(filtri)
 
@@ -2952,12 +2965,14 @@ def get_gps_storico(
     return [dict(r) for r in rows]
 
 
-def get_gps_mean_by_session():
+def get_gps_mean_by_session(stagione_id=None):
     """Media squadra per seduta (giocatori validi) con dati cardio aggregati."""
     conn = get_connection()
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
-    cursor.execute("""
+    where_extra = "AND sedute.stagione_id = ?" if stagione_id is not None else ""
+    params = (int(stagione_id),) if stagione_id is not None else ()
+    cursor.execute(f"""
         SELECT
             sedute.id               AS seduta_id,
             sedute.data             AS data_seduta,
@@ -2999,10 +3014,10 @@ def get_gps_mean_by_session():
             ON c.seduta_id = gps.seduta_id
            AND c.giocatore_id = gps.giocatore_id
         JOIN sedute ON gps.seduta_id = sedute.id
-        WHERE COALESCE(gps.valido, 1) = 1
+        WHERE COALESCE(gps.valido, 1) = 1 {where_extra}
         GROUP BY sedute.id
         ORDER BY date(sedute.data)
-    """)
+    """, params)
     rows = cursor.fetchall()
     conn.close()
     return [dict(r) for r in rows]

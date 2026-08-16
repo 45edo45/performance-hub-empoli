@@ -822,6 +822,19 @@ def _get_season_players_ui():
 def _render_analisi_tab():
     st.subheader("Analisi storica GPS & Cardio")
 
+    # ── Selezione stagione (default: stagione attiva) ──
+    stagioni = get_seasons()
+    stagioni_opts = {s["nome"]: s["id"] for s in stagioni}
+    stagione_attiva_nome = next(
+        (s["nome"] for s in stagioni if s["attiva"] == 1),
+        stagioni[0]["nome"] if stagioni else None,
+    )
+    idx_default = list(stagioni_opts.keys()).index(stagione_attiva_nome) if stagione_attiva_nome else 0
+    stagione_scelta = st.selectbox(
+        "Stagione", list(stagioni_opts.keys()), index=idx_default, key="stor_stagione"
+    )
+    stagione_id_sel = stagioni_opts[stagione_scelta] if stagione_scelta else None
+
     players, filtered_by_season = _get_season_players_ui()
     if not players:
         st.warning("Nessun giocatore disponibile. Verifica la rosa nella pagina Giocatori.")
@@ -862,6 +875,7 @@ def _render_analisi_tab():
         giocatore_ids=giocatore_ids,
         data_da=str(data_da) if data_da else None,
         data_a=str(data_a) if data_a else None,
+        stagione_id=stagione_id_sel,
     )
 
     if not storico:
@@ -1024,7 +1038,8 @@ def _render_analisi_tab():
 
         rename_map = {"data_label": "Data"}
         rename_map.update({c: ALL_LABELS[c] for c in all_cols if c in ALL_LABELS})
-        tab = df_plot[["data_label"] + all_cols].sort_values("data_seduta", ascending=False).rename(columns=rename_map) if "data_seduta" in df_plot.columns else df_plot[["data_label"] + all_cols].iloc[::-1].rename(columns=rename_map)
+        df_plot_sorted = df_plot.sort_values("data_seduta", ascending=False) if "data_seduta" in df_plot.columns else df_plot.iloc[::-1]
+        tab = df_plot_sorted[["data_label"] + all_cols].rename(columns=rename_map)
         numeric_cols = [ALL_LABELS[c] for c in all_cols if c in ALL_LABELS and pd.api.types.is_numeric_dtype(tab[ALL_LABELS[c]])]
         st.dataframe(
             tab.style.format({col: "{:.1f}" for col in numeric_cols}, na_rep="—"),
@@ -1033,7 +1048,7 @@ def _render_analisi_tab():
 
     # ── 4) MEDIA SQUADRA PER SEDUTA ──
     elif modalita == "📊 Media squadra per seduta":
-        medie = get_gps_mean_by_session()
+        medie = get_gps_mean_by_session(stagione_id=stagione_id_sel)
         if not medie:
             st.info("Nessun dato GPS nel database.")
             return
