@@ -36,15 +36,49 @@ def _load_db_url() -> str:
     return ""
 
 
-class _Row(dict):
-    """Dict con supporto all'indice intero (es. row[0]) — mima sqlite3.Row."""
+class _Row:
+    """
+    Riga risultato PostgreSQL compatibile con sqlite3.Row.
+    - row['col']  → accesso per nome
+    - row[0]      → accesso per indice
+    - iter(row)   → itera sui VALORI (non sulle chiavi)
+      così pd.DataFrame(rows, columns=[...]) usa la posizione, non i nomi,
+      esattamente come fa sqlite3.Row.
+    """
+    __slots__ = ("_keys", "_vals")
+
+    def __init__(self, mapping):
+        self._keys = list(mapping.keys())
+        self._vals = list(mapping.values())
+
     def __getitem__(self, key):
         if isinstance(key, int):
-            return list(self.values())[key]
-        return super().__getitem__(key)
+            return self._vals[key]
+        try:
+            return self._vals[self._keys.index(key)]
+        except ValueError:
+            raise KeyError(key)
 
-    def keys(self):  # noqa: used by callers
-        return super().keys()
+    def get(self, key, default=None):
+        try:
+            return self[key]
+        except KeyError:
+            return default
+
+    def __iter__(self):
+        return iter(self._vals)
+
+    def __len__(self):
+        return len(self._vals)
+
+    def keys(self):
+        return self._keys
+
+    def values(self):
+        return self._vals
+
+    def items(self):
+        return zip(self._keys, self._vals)
 
 
 class _Cursor:
